@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>expence tracker(by farman)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        brand: { 500: '#0071e3', 600: '#005bb5' },
+                        dark: { 800: '#1c1c1e', 900: '#000000' }
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Scrollbar for horizontal nav */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .dark .glass-panel {
+            background: rgba(28, 28, 30, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Calculator Grid */
+        .calc-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        .calc-btn {
+            height: 60px;
+            font-size: 1.25rem;
+            font-weight: 500;
+            border-radius: 16px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        .calc-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Smooth transitions */
+        .page-transition {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .ai-result p {
+            margin-bottom: 0.5rem;
+        }
+
+        .ai-result strong {
+            font-weight: 600;
+            color: #0071e3;
+        }
+
+        .dark .ai-result strong {
+            color: #60a5fa;
+        }
+    </style>
+</head>
+
+<body
+    class="bg-gray-100 text-gray-900 dark:bg-black dark:text-gray-100 transition-colors duration-300 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="glass-panel sticky top-0 z-50 px-6 py-4 flex justify-between items-center shadow-sm">
+        <div class="flex items-center gap-2">
+            <h1 class="text-xl font-bold tracking-tight">expence tracker(by farman) <span class="text-brand-500"></span>
+            </h1>
+        </div>
+        <div class="flex items-center gap-4">
+            <span id="clock"
+                class="hidden sm:block text-sm font-medium text-gray-500 dark:text-gray-400 font-mono"></span>
+            <button id="themeToggle"
+                class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors">
+                <i class="fas fa-moon dark:hidden text-gray-600"></i>
+                <i class="fas fa-sun hidden dark:block text-yellow-400"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav
+        class="sticky top-[72px] z-40 bg-gray-100/95 dark:bg-black/95 py-2 border-b border-gray-200 dark:border-gray-800">
+        <div class="max-w-4xl mx-auto px-4 overflow-x-auto hide-scrollbar flex gap-2" id="navContainer">
+            <!-- Nav buttons injected by JS -->
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow container max-w-2xl mx-auto p-4 sm:p-6">
+        <div id="contentArea" class="relative">
+            <!-- Pages injected by JS -->
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer
+        class="text-center py-6 text-sm text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-800 mt-auto">
+        <p>(ALL RIGHTS RESERVED TO FARMAN)<BR>
+            CONTACT=FARMANSHAFI2007@GMAIL.COM
+
+        </p>
+    </footer>
+
+    <script>
+        // --- App Config & State ---
+        const tools = [
+            { id: 'calc', name: 'Calculator', icon: 'fa-calculator' },
+            { id: 'emi', name: 'EMI Loan', icon: 'fa-home' },
+            { id: 'sip', name: 'SIP Invest', icon: 'fa-chart-line' },
+            { id: 'fd', name: 'Fixed Deposit', icon: 'fa-piggy-bank' },
+            { id: 'salary', name: 'Budget 50/30/20', icon: 'fa-wallet' },
+            { id: 'gst', name: 'GST Calc', icon: 'fa-percent' },
+            { id: 'discount', name: 'Discount', icon: 'fa-tags' },
+            { id: 'retirement', name: 'Retirement', icon: 'fa-umbrella-beach' }
+        ];
+
+        let currentTool = 'calc';
+        const apiKey = ""; // API key injected by environment
+
+        // --- Utility Functions ---
+        const formatCurrency = (num) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(num);
+        const formatNumber = (num) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(num);
+
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initTheme();
+            renderNav();
+            renderPages();
+            startClock();
+            switchTool(0);
+        });
+
+        function startClock() {
+            const clockEl = document.getElementById('clock');
+            const update = () => clockEl.innerText = new Date().toLocaleTimeString('en-US', { hour12: true, hour: 'numeric', minute: '2-digit' });
+            setInterval(update, 1000);
+            update();
+        }
+
+        // --- Theme Handling ---
+        function initTheme() {
+            const btn = document.getElementById('themeToggle');
+            const isDark = localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            if (isDark) document.documentElement.classList.add('dark');
+
+            btn.onclick = () => {
+                document.documentElement.classList.toggle('dark');
+                localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+            };
+        }
+
+        // --- Navigation Renderer ---
+        function renderNav() {
+            const nav = document.getElementById('navContainer');
+            nav.innerHTML = tools.map((t, i) => `
+                <button onclick="switchTool(${i})" id="nav-btn-${i}" 
+                    class="whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 border border-transparent
+                    hover:bg-white hover:shadow-sm dark:hover:bg-gray-800">
+                    <i class="fas ${t.icon} mr-2 opacity-70"></i>${t.name}
+                </button>
+            `).join('');
+        }
+
+        function switchTool(index) {
+            // Update Nav UI
+            tools.forEach((_, i) => {
+                const btn = document.getElementById(`nav-btn-${i}`);
+                const page = document.getElementById(`page-${i}`);
+
+                if (i === index) {
+                    btn.classList.add('bg-white', 'text-brand-600', 'shadow-md', 'dark:bg-gray-800', 'dark:text-blue-400');
+                    btn.classList.remove('text-gray-600', 'dark:text-gray-300');
+                    page.classList.remove('hidden');
+                    page.classList.add('page-transition');
+                } else {
+                    btn.classList.remove('bg-white', 'text-brand-600', 'shadow-md', 'dark:bg-gray-800', 'dark:text-blue-400');
+                    btn.classList.add('text-gray-600', 'dark:text-gray-300');
+                    page.classList.add('hidden');
+                }
+            });
+        }
+
+        // --- Page Renderer ---
+        function renderPages() {
+            const container = document.getElementById('contentArea');
+            container.innerHTML = tools.map((t, i) => `
+                <div id="page-${i}" class="hidden w-full">
+                    <div class="glass-panel rounded-3xl p-6 shadow-xl dark:shadow-none">
+                        <div class="flex items-center mb-6">
+                            <div class="p-3 rounded-2xl bg-brand-500/10 text-brand-600 dark:text-blue-400 mr-4">
+                                <i class="fas ${t.icon} text-xl"></i>
+                            </div>
+                            <h2 class="text-2xl font-bold">${t.name}</h2>
+                        </div>
+                        <div id="content-${t.id}">
+                            ${getToolHTML(t.id)}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            // Initialize Calculator listeners
+            initCalculator();
+        }
+
+        // --- Tool Logic & Templates ---
+        function getToolHTML(id) {
+            const inputs = (id, ph, type = 'number') => `<input type="${type}" id="${id}" placeholder="${ph}" class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 mb-3 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-shadow">`;
+            const btn = (fn, text, variant = 'primary') => {
+                const colors = variant === 'ai'
+                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white'
+                    : 'bg-brand-500 hover:bg-brand-600 text-white';
+                return `<button onclick="${fn}" class="w-full ${colors} font-semibold py-3.5 rounded-xl transition-all shadow-lg shadow-brand-500/30 mt-2">${text}</button>`;
+            };
+            const resultBox = (id) => `<div id="${id}" class="mt-6 p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 min-h-[60px] flex flex-col justify-center items-center text-center text-sm text-gray-500">Enter values to calculate</div>`;
+
+            switch (id) {
+                case 'calc':
+                    return `
+                        <input id="calcDisplay" readonly class="w-full text-right text-4xl font-light bg-transparent border-none mb-6 text-gray-800 dark:text-white focus:ring-0 px-2" placeholder="0">
+                        <div class="calc-grid" id="calcKeys"></div>
+                    `;
+                case 'emi':
+                    return `
+                        ${inputs('emiP', 'Loan Amount (₹)')}
+                        ${inputs('emiR', 'Interest Rate (%)')}
+                        ${inputs('emiN', 'Tenure (Months)')}
+                        ${btn('calculateEMI()', 'Calculate EMI')}
+                        ${resultBox('emiResult')}
+                    `;
+                case 'sip':
+                    return `
+                        ${inputs('sipP', 'Monthly Investment (₹)')}
+                        ${inputs('sipR', 'Expected Return Rate (%)')}
+                        ${inputs('sipT', 'Time Period (Years)')}
+                        ${btn('calculateSIP()', 'Forecast Growth')}
+                        ${resultBox('sipResult')}
+                    `;
+                case 'fd':
+                    return `
+                        ${inputs('fdP', 'Deposit Amount (₹)')}
+                        ${inputs('fdR', 'Interest Rate (%)')}
+                        ${inputs('fdT', 'Time Period (Years)')}
+                        ${btn('calculateFD()', 'Calculate Maturity')}
+                        ${resultBox('fdResult')}
+                    `;
+                case 'gst':
+                    return `
+                        ${inputs('gstAmt', 'Original Amount (₹)')}
+                        ${inputs('gstRate', 'GST Rate (%)', 'number')}
+                        <div class="grid grid-cols-2 gap-2 mt-1 mb-3">
+                            <button onclick="calculateGST(true)" class="bg-gray-200 dark:bg-gray-800 py-2 rounded-lg text-sm font-medium">Add GST (+)</button>
+                            <button onclick="calculateGST(false)" class="bg-gray-200 dark:bg-gray-800 py-2 rounded-lg text-sm font-medium">Remove GST (-)</button>
+                        </div>
+                        ${resultBox('gstResult')}
+                    `;
+                case 'salary':
+                    return `
+                        ${inputs('salAmt', 'Monthly Income (₹)')}
+                        ${btn('calculateBudget()', 'Analyze Budget')}
+                        ${resultBox('salResult')}
+                        <div id="aiBudgetBtnContainer" class="hidden mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
+                             ${btn('askGeminiBudget()', '✨ Generate Smart Spending Plan', 'ai')}
+                             <div id="aiBudgetResult" class="mt-4 text-sm text-left hidden"></div>
+                        </div>
+                    `;
+                case 'discount':
+                    return `
+                        ${inputs('discPrice', 'Original Price (₹)')}
+                        ${inputs('discPer', 'Discount Percentage (%)')}
+                        ${btn('calculateDiscount()', 'Calculate Savings')}
+                        ${resultBox('discResult')}
+                    `;
+                case 'retirement':
+                    return `
+                        ${inputs('retCurr', 'Current Monthly Savings (₹)')}
+                        ${inputs('retAge', 'Years until Retirement')}
+                        ${btn('calculateRetirement()', 'Estimate Corpus')}
+                        ${resultBox('retResult')}
+                        <div id="aiRetirementBtnContainer" class="hidden mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
+                             ${btn('askGeminiRetirement()', '✨ Review My Plan with AI', 'ai')}
+                             <div id="aiRetirementResult" class="mt-4 text-sm text-left hidden"></div>
+                        </div>
+                    `;
+                default: return '';
+            }
+        }
+
+        // --- Calculation Logics ---
+
+        // 1. Calculator
+        function initCalculator() {
+            const keys = ['C', '%', '⌫', '/', '7', '8', '9', '*', '4', '5', '6', '-', '1', '2', '3', '+', '00', '0', '.', '='];
+            const grid = document.getElementById('calcKeys');
+            if (!grid) return;
+
+            grid.innerHTML = keys.map(k => {
+                let colorClass = 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white';
+                if (['/', '*', '-', '+', '='].includes(k)) colorClass = 'bg-brand-500 text-white hover:bg-brand-600';
+                if (['C', '%', '⌫'].includes(k)) colorClass = 'bg-gray-200 dark:bg-gray-700';
+                return `<button class="calc-btn ${colorClass}" onclick="handleCalc('${k}')">${k}</button>`;
+            }).join('');
+        }
+
+        function handleCalc(key) {
+            const display = document.getElementById('calcDisplay');
+            if (key === 'C') display.value = '';
+            else if (key === '⌫') display.value = display.value.slice(0, -1);
+            else if (key === '=') {
+                try {
+                    // Safe evaluation
+                    const sanitized = display.value.replace(/[^-()\d/*+.]/g, '');
+                    display.value = new Function('return ' + sanitized)();
+                } catch { display.value = 'Error'; }
+            } else {
+                display.value += key;
+            }
+        }
+
+        // 2. EMI
+        window.calculateEMI = () => {
+            const P = +document.getElementById('emiP').value;
+            const r = +document.getElementById('emiR').value / 1200;
+            const n = +document.getElementById('emiN').value;
+            const res = document.getElementById('emiResult');
+
+            if (!P || !r || !n) return res.innerHTML = `<span class="text-red-500">Please fill all fields</span>`;
+
+            const emi = (P * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+            const totalPay = emi * n;
+            const totalInt = totalPay - P;
+
+            res.innerHTML = `
+                <div class="text-3xl font-bold text-gray-900 dark:text-white mb-1">${formatCurrency(emi)}<span class="text-sm font-normal text-gray-500">/mo</span></div>
+                <div class="w-full bg-gray-200 dark:bg-gray-700 h-2 rounded-full mt-3 overflow-hidden">
+                    <div class="bg-brand-500 h-full" style="width: ${(P / totalPay) * 100}%"></div>
+                </div>
+                <div class="flex justify-between text-xs mt-2 text-gray-500">
+                    <span>Principal: ${Math.round((P / totalPay) * 100)}%</span>
+                    <span>Interest: ${Math.round((totalInt / totalPay) * 100)}%</span>
+                </div>
+                <div class="mt-4 grid grid-cols-2 gap-4 text-left">
+                    <div><p class="text-xs text-gray-500">Total Interest</p><p class="font-semibold text-red-500">${formatCurrency(totalInt)}</p></div>
+                    <div><p class="text-xs text-gray-500">Total Payment</p><p class="font-semibold text-gray-900 dark:text-white">${formatCurrency(totalPay)}</p></div>
+                </div>
+            `;
+        }
+
+        // 3. SIP
+        window.calculateSIP = () => {
+            const P = +document.getElementById('sipP').value;
+            const r = +document.getElementById('sipR').value / 1200; // monthly rate
+            const t = +document.getElementById('sipT').value; // years
+            const n = t * 12; // months
+            const res = document.getElementById('sipResult');
+
+            if (!P || !r || !t) return res.innerHTML = `<span class="text-red-500">Please fill all fields</span>`;
+
+            const totalValue = P * ((Math.pow(1 + r, n) - 1) / r) * (1 + r);
+            const invested = P * n;
+            const gain = totalValue - invested;
+
+            res.innerHTML = `
+                <div class="text-center">
+                    <p class="text-sm text-gray-500">Maturity Value</p>
+                    <p class="text-3xl font-bold text-green-500">${formatCurrency(totalValue)}</p>
+                </div>
+                <div class="mt-4 p-3 bg-white dark:bg-gray-900 rounded-lg flex justify-between items-center text-sm">
+                    <div>Invested: <span class="font-semibold">${formatCurrency(invested)}</span></div>
+                    <div class="text-green-500">+${formatCurrency(gain)}</div>
+                </div>
+            `;
+        }
+
+        // 4. FD
+        window.calculateFD = () => {
+            const P = +document.getElementById('fdP').value;
+            const r = +document.getElementById('fdR').value;
+            const t = +document.getElementById('fdT').value;
+            const res = document.getElementById('fdResult');
+
+            if (!P || !r || !t) return res.innerHTML = `<span class="text-red-500">Please fill all fields</span>`;
+
+            const total = P * Math.pow(1 + r / 100, t);
+            res.innerHTML = `
+                <div class="text-3xl font-bold text-brand-500">${formatCurrency(total)}</div>
+                <p class="text-sm text-gray-500 mt-1">Interest Earned: ${formatCurrency(total - P)}</p>
+            `;
+        }
+
+        // 5. GST
+        window.calculateGST = (isAdd) => {
+            const amt = +document.getElementById('gstAmt').value;
+            const rate = +document.getElementById('gstRate').value;
+            const res = document.getElementById('gstResult');
+
+            if (!amt || !rate) return res.innerHTML = `<span class="text-red-500">Enter amount & rate</span>`;
+
+            let final, gstAmt;
+            if (isAdd) {
+                final = amt * (1 + rate / 100);
+                gstAmt = final - amt;
+            } else {
+                final = amt / (1 + rate / 100);
+                gstAmt = amt - final;
+            }
+
+            res.innerHTML = `
+                <div class="grid grid-cols-2 gap-4 text-left w-full">
+                    <div><p class="text-xs text-gray-500">Net Amount</p><p class="text-xl font-bold">${formatCurrency(final)}</p></div>
+                    <div><p class="text-xs text-gray-500">GST Amount</p><p class="text-xl font-bold text-brand-500">${formatCurrency(gstAmt)}</p></div>
+                </div>
+            `;
+        }
+
+        // 6. Salary (50-30-20 Rule)
+        window.calculateBudget = () => {
+            const s = +document.getElementById('salAmt').value;
+            if (!s) return;
+
+            const needs = s * 0.5;
+            const wants = s * 0.3;
+            const savings = s * 0.2;
+
+            document.getElementById('salResult').innerHTML = `
+                <div class="space-y-3 w-full">
+                    <div>
+                        <div class="flex justify-between text-sm mb-1"><span>Needs (50%)</span><span class="font-bold">${formatCurrency(needs)}</span></div>
+                        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2"><div class="bg-blue-500 h-2 rounded-full" style="width:50%"></div></div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-sm mb-1"><span>Wants (30%)</span><span class="font-bold">${formatCurrency(wants)}</span></div>
+                        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2"><div class="bg-purple-500 h-2 rounded-full" style="width:30%"></div></div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-sm mb-1"><span>Savings (20%)</span><span class="font-bold">${formatCurrency(savings)}</span></div>
+                        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2"><div class="bg-green-500 h-2 rounded-full" style="width:20%"></div></div>
+                    </div>
+                </div>
+            `;
+            // Show AI Button
+            document.getElementById('aiBudgetBtnContainer').classList.remove('hidden');
+            document.getElementById('aiBudgetResult').classList.add('hidden');
+        }
+
+        // 7. Discount
+        window.calculateDiscount = () => {
+            const p = +document.getElementById('discPrice').value;
+            const d = +document.getElementById('discPer').value;
+            if (!p || !d) return;
+            const saved = p * (d / 100);
+            const final = p - saved;
+
+            document.getElementById('discResult').innerHTML = `
+                <div class="text-center">
+                    <p class="text-xs text-gray-500 line-through">${formatCurrency(p)}</p>
+                    <div class="text-3xl font-bold text-green-500">${formatCurrency(final)}</div>
+                    <div class="inline-block bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-3 py-1 rounded-full text-xs font-bold mt-2">
+                        You Save ${formatCurrency(saved)}
+                    </div>
+                </div>
+            `;
+        }
+
+        // 8. Retirement
+        window.calculateRetirement = () => {
+            const p = +document.getElementById('retCurr').value;
+            const t = +document.getElementById('retAge').value;
+            if (!p || !t) return;
+
+            // Assuming 12% annual return for retirement
+            const r = 12 / 1200;
+            const n = t * 12;
+            const total = p * ((Math.pow(1 + r, n) - 1) / r) * (1 + r);
+
+            document.getElementById('retResult').innerHTML = `
+                <div class="text-center">
+                    <p class="text-sm text-gray-500">Estimated Corpus @ 12%</p>
+                    <div class="text-2xl font-bold text-brand-500">${formatCurrency(total)}</div>
+                    <p class="text-xs text-gray-400 mt-2">Based on monthly investment of ${formatCurrency(p)}</p>
+                </div>
+            `;
+            // Show AI Button
+            document.getElementById('aiRetirementBtnContainer').classList.remove('hidden');
+            document.getElementById('aiRetirementResult').classList.add('hidden');
+        }
+
+        // --- GEMINI AI INTEGRATION ---
+
+        async function callGemini(prompt, outputId) {
+            const outputEl = document.getElementById(outputId);
+            outputEl.classList.remove('hidden');
+            outputEl.innerHTML = `<div class="animate-pulse flex space-x-2 items-center justify-center py-4"><div class="h-2 w-2 bg-purple-500 rounded-full animate-bounce"></div><div class="h-2 w-2 bg-indigo-500 rounded-full animate-bounce delay-75"></div><div class="h-2 w-2 bg-blue-500 rounded-full animate-bounce delay-150"></div></div>`;
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }]
+                    })
+                });
+
+                if (!response.ok) throw new Error('AI Service Error');
+
+                const data = await response.json();
+                let text = data.candidates[0].content.parts[0].text;
+
+                // Simple markdown formatting
+                text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                text = text.replace(/\n/g, '<br>');
+
+                outputEl.innerHTML = `<div class="ai-result bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-gray-800 dark:to-gray-800 p-4 rounded-xl border border-purple-100 dark:border-gray-700 leading-relaxed">${text}</div>`;
+
+            } catch (error) {
+                console.error(error);
+                outputEl.innerHTML = `<div class="text-red-500 text-center py-2">Could not generate AI insights. Please try again.</div>`;
+            }
+        }
+
+        function askGeminiBudget() {
+            const salary = document.getElementById('salAmt').value;
+            const prompt = `Act as a financial advisor in India. I earn ₹${salary} per month. create a concise, practical monthly spending plan using the 50/30/20 rule. List specific categories (e.g., Rent, Groceries, Utilities for Needs; Dining, Entertainment for Wants; SIP, Emergency Fund for Savings) with estimated rupee amounts based on Indian cost of living. Keep it under 150 words. Use bullet points.`;
+            callGemini(prompt, 'aiBudgetResult');
+        }
+
+        function askGeminiRetirement() {
+            const p = document.getElementById('retCurr').value;
+            const t = document.getElementById('retAge').value;
+            const r = 12 / 1200;
+            const n = t * 12;
+            const total = Math.round(p * ((Math.pow(1 + r, n) - 1) / r) * (1 + r));
+
+            const prompt = `Act as a financial advisor. I invest ₹${p} monthly for my retirement which is ${t} years away. My projected corpus at 12% return is ₹${total}. Briefly analyze if this is sufficient for a comfortable retirement in India, considering standard inflation of 6%. Suggest 2 specific improvements or investment vehicles. Keep it under 100 words.`;
+            callGemini(prompt, 'aiRetirementResult');
+        }
+
+    </script>
+</body>
+
+</html>
